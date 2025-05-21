@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('docker-hub-credentials')
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    docker.build("my-app:${env.BUILD_ID}")
+                }
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'docker run my-app:${BUILD_ID} npm test'
+            }
+        }
+        
+        stage('Push') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("my-app:${env.BUILD_ID}").push()
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                sh 'docker run -d -p 3000:3000 my-app:${BUILD_ID}'
+            }
+        }
+    }
+    
+    post {
+        always {
+            sh 'docker system prune -f'
+        }
+    }
+}
